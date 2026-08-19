@@ -54,7 +54,11 @@ class PromptStorage:
     def load(self) -> list[PromptSnippet]:
         if not self.path.exists():
             prompts = [PromptSnippet.from_dict(item.to_dict()) for item in DEFAULT_PROMPTS]
-            self.save(prompts)
+            try:
+                self.save(prompts)
+            except StorageError as error:
+                if self.on_load_error:
+                    self.on_load_error(str(error))
             return prompts
 
         try:
