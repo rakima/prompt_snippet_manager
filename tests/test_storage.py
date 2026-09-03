@@ -15,7 +15,7 @@ class PromptStorageTests(unittest.TestCase):
     def test_creates_defaults_and_round_trips_extended_fields(self):
         storage = PromptStorage(self.path)
         prompts = storage.load()
-        self.assertEqual(len(prompts), 5)
+        self.assertEqual(len(prompts), 12)
         prompt = PromptSnippet.create("開発", "テスト", "{name}を確認")
         prompt.tags = ["確認", "開発"]
         prompt.favorite = True
