@@ -73,31 +73,15 @@ class PromptEditor(tk.Toplevel):
         self.destroy()
 
 
-class TemplateValuesDialog(tk.Toplevel):
-    def __init__(self, parent: tk.Misc, variables: list[str]):
-        super().__init__(parent)
-        self.result: dict[str, str] | None = None
-        self.title("テンプレート変数")
-        self.transient(parent)
-        self.grab_set()
-        form = ttk.Frame(self, padding=18)
-        form.pack(fill="both", expand=True)
-        form.columnconfigure(1, weight=1)
-        self.entries: dict[str, ttk.Entry] = {}
-        for row, variable in enumerate(variables):
-            ttk.Label(form, text="{" + variable + "}").grid(row=row, column=0, sticky="w", padx=(0, 12), pady=4)
-            entry = ttk.Entry(form)
-            entry.grid(row=row, column=1, sticky="ew", pady=4)
-            self.entries[variable] = entry
-        buttons = ttk.Frame(form)
-        buttons.grid(row=len(variables), column=1, sticky="e", pady=(14, 0))
-        ttk.Button(buttons, text="キャンセル", command=self.destroy).pack(side="right", padx=(8, 0))
-        ttk.Button(buttons, text="コピー", command=self.submit).pack(side="right")
-        self.entries[variables[0]].focus_set()
+TEMPLATE_PATTERN = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
-    def submit(self) -> None:
-        self.result = {variable: entry.get() for variable, entry in self.entries.items()}
-        self.destroy()
+
+def template_variables(value: str) -> list[str]:
+    return list(dict.fromkeys(match.group(1) for match in TEMPLATE_PATTERN.finditer(value)))
+
+
+def render_template(value: str, replacements: dict[str, str]) -> str:
+    return TEMPLATE_PATTERN.sub(lambda match: replacements[match.group(1)], value)
 
 
 class PromptSnippetManager(tk.Tk):
@@ -117,6 +101,9 @@ class PromptSnippetManager(tk.Tk):
         self.search_var = tk.StringVar()
         self.sort_var = tk.StringVar(value="タイトル順")
         self.favorite_only = tk.BooleanVar(value=False)
+        self.template_entries: dict[str, list[ttk.Entry]] = {}
+        self.template_values: dict[str, tk.StringVar] = {}
+        self.template_entry_order: list[ttk.Entry] = []
         if self.status_var.get() == "準備中":
             self.status_var.set("準備完了")
         self.build_ui()
@@ -168,8 +155,9 @@ class PromptSnippetManager(tk.Tk):
         detail.grid(row=2, column=0, sticky="nsew", padx=18)
         detail.columnconfigure(0, weight=1)
         detail.rowconfigure(0, weight=1)
-        self.prompt_text = tk.Text(detail, height=8, wrap="word", state="disabled", background="#f7f8f9", relief="flat", padx=10, pady=8)
+        self.prompt_text = tk.Text(detail, height=8, wrap="word", background="#f7f8f9", relief="flat", padx=10, pady=8)
         self.prompt_text.grid(row=0, column=0, sticky="nsew")
+        self.prompt_text.bind("<Key>", lambda _event: "break")
         scrollbar = ttk.Scrollbar(detail, orient="vertical", command=self.prompt_text.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.prompt_text.configure(yscrollcommand=scrollbar.set)
@@ -233,7 +221,7 @@ class PromptSnippetManager(tk.Tk):
             self.on_prompt_selected(None)
         else:
             self.selected_prompt_id = None
-            self.set_detail("")
+            self.set_detail_prompt("")
 
     def on_prompt_selected(self, _event: tk.Event | None) -> None:
         selection = self.prompt_list.curselection()
@@ -241,13 +229,51 @@ class PromptSnippetManager(tk.Tk):
             return
         prompt = self.filtered_prompts[selection[0]]
         self.selected_prompt_id = prompt.id
-        self.set_detail(prompt.prompt)
+        self.set_detail_prompt(prompt.prompt)
 
-    def set_detail(self, value: str) -> None:
-        self.prompt_text.configure(state="normal")
+    def set_detail_prompt(self, value: str) -> None:
+        for entry in self.template_entry_order:
+            entry.destroy()
+        self.template_entries.clear()
+        self.template_values.clear()
+        self.template_entry_order.clear()
         self.prompt_text.delete("1.0", "end")
-        self.prompt_text.insert("1.0", value)
-        self.prompt_text.configure(state="disabled")
+        cursor = 0
+        for match in TEMPLATE_PATTERN.finditer(value):
+            self.prompt_text.insert("end", value[cursor:match.start()])
+            variable = match.group(1)
+            variable_value = self.template_values.setdefault(variable, tk.StringVar())
+            entry = ttk.Entry(self.prompt_text, textvariable=variable_value, width=max(12, len(variable) + 4))
+            entry.bind("<Return>", lambda _event: self.copy_prompt() or "break")
+            entry.bind("<Tab>", self.focus_next_template_entry)
+            entry.bind("<Shift-Tab>", self.focus_previous_template_entry)
+            self.prompt_text.window_create("end", window=entry, padx=2)
+            self.template_entries.setdefault(variable, []).append(entry)
+            self.template_entry_order.append(entry)
+            cursor = match.end()
+        self.prompt_text.insert("end", value[cursor:])
+
+    def focus_next_template_entry(self, _event: tk.Event) -> str:
+        if not self.template_entry_order:
+            return "break"
+        current = self.focus_get()
+        try:
+            index = self.template_entry_order.index(current)
+        except ValueError:
+            index = -1
+        self.template_entry_order[(index + 1) % len(self.template_entry_order)].focus_set()
+        return "break"
+
+    def focus_previous_template_entry(self, _event: tk.Event) -> str:
+        if not self.template_entry_order:
+            return "break"
+        current = self.focus_get()
+        try:
+            index = self.template_entry_order.index(current)
+        except ValueError:
+            index = 0
+        self.template_entry_order[(index - 1) % len(self.template_entry_order)].focus_set()
+        return "break"
 
     def get_selected_prompt(self) -> PromptSnippet | None:
         return next((prompt for prompt in self.prompts if prompt.id == self.selected_prompt_id), None)
@@ -323,17 +349,13 @@ class PromptSnippetManager(tk.Tk):
         if not prompt:
             self.show_status("コピーするプロンプトを選択してください")
             return
-        variables = sorted(set(re.findall(r"\{([A-Za-z_][A-Za-z0-9_]*)\}", prompt.prompt)))
-        replacement_values: dict[str, str] = {}
-        if variables:
-            dialog = TemplateValuesDialog(self, variables)
-            self.wait_window(dialog)
-            if dialog.result is None:
-                return
-            replacement_values = dialog.result
-        copied_text = prompt.prompt
+        replacement_values = {variable: value.get() for variable, value in self.template_values.items()}
         for variable, value in replacement_values.items():
-            copied_text = copied_text.replace("{" + variable + "}", value)
+            if not value.strip():
+                self.template_entries[variable][0].focus_set()
+                self.show_status(f"{{{variable}}} を入力してください")
+                return
+        copied_text = render_template(prompt.prompt, replacement_values)
         self.clipboard_clear()
         self.clipboard_append(copied_text)
         self.update()
