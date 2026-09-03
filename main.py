@@ -386,8 +386,10 @@ class PromptSnippetManager(tk.Tk):
         self.update()
         updated_prompt = replace(prompt, use_count=prompt.use_count + 1, last_used_at=datetime.now().isoformat(timespec="seconds"))
         updated_prompts = [updated_prompt if item.id == prompt.id else item for item in self.prompts]
-        if self.persist(updated_prompts):
-            self.prompts = updated_prompts
+        if not self.persist(updated_prompts):
+            self.show_status("クリップボードにコピーしました（使用履歴の保存に失敗しました）")
+            return
+        self.prompts = updated_prompts
         self.show_status("クリップボードにコピーしました")
         self.after(2500, lambda: self.show_status("準備完了"))
 

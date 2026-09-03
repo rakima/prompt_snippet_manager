@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from models import PromptSnippet
 from storage import PromptStorage
+from storage import StorageError
 
 try:
     import tkinter as tk
@@ -74,6 +75,25 @@ class PromptSnippetManagerGuiTests(unittest.TestCase):
 
         self.assertEqual(self.app.clipboard_get(), "main.py を確認。main.py を修正。")
         self.assertEqual(self.app.get_selected_prompt().use_count, 1)
+
+    def test_copy_reports_history_save_failure_without_mutating_memory(self):
+        self.app.select_category("開発")
+        self.app.selected_prompt_id = self.app.filtered_prompts[0].id
+        self.app.set_detail_prompt(self.app.filtered_prompts[0].prompt)
+        self.app.template_values["target"].set("main.py")
+        original_count = self.app.get_selected_prompt().use_count
+
+        class BrokenStorage:
+            def save(self, _prompts):
+                raise StorageError("保存失敗")
+
+        self.app.storage = BrokenStorage()
+        with patch("main.messagebox.showerror"):
+            self.app.copy_prompt()
+
+        self.assertEqual(self.app.clipboard_get(), "main.py を確認。main.py を修正。")
+        self.assertEqual(self.app.get_selected_prompt().use_count, original_count)
+        self.assertIn("使用履歴の保存に失敗", self.app.status_var.get())
 
     def test_new_edit_delete_operations_keep_gui_in_sync(self):
         new_prompt = PromptSnippet.create("GitHub", "新規", "本文")
