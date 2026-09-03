@@ -39,6 +39,49 @@ DEFAULT_PROMPTS = [
         title="改善案",
         prompt="現在のツールを確認し、追加すると有用そうな機能を提案してください。\n実装コストと効果を考慮し、優先順位を付けてください。",
     ),
+    PromptSnippet(
+        id="default-requirements",
+        category="開発",
+        title="要件整理",
+        prompt="以下の要望を、目的・機能要件・制約・未確定事項に整理してください。\n不足している情報があれば質問として列挙してください。",
+    ),
+    PromptSnippet(
+        id="default-error-investigation",
+        category="開発",
+        title="エラー調査",
+        prompt="以下のエラーについて、原因の候補、確認すべき箇所、再現手順、修正案を整理してください。\n推測と確認済みの事実を分けて説明してください。",
+    ),
+    PromptSnippet(
+        id="default-test-design",
+        category="開発",
+        title="テスト設計",
+        prompt="この機能に必要なテストケースを洗い出してください。\n正常系・異常系・境界値・回帰テストに分け、優先度も付けてください。",
+    ),
+    PromptSnippet(
+        id="default-explanation",
+        category="文章作成",
+        title="わかりやすく説明",
+        prompt="以下の内容を、前提知識がない人にも伝わるように説明してください。\n重要な用語は簡潔に定義し、具体例を1つ含めてください。",
+    ),
+    PromptSnippet(
+        id="default-rewrite",
+        category="文章作成",
+        title="文章改善",
+        prompt="以下の文章を、意味を変えずに読みやすく改善してください。\n変更点と変更理由も簡潔に示してください。",
+    ),
+    PromptSnippet(
+        id="default-comparison",
+        category="その他",
+        title="比較検討",
+        prompt="以下の選択肢を、目的への適合度・メリット・デメリット・コスト・リスクで比較してください。\n最後に推奨案とその理由を示してください。",
+    ),
+    PromptSnippet(
+        id="default-symbol-review",
+        category="開発",
+        title="シンボル別コードレビュー",
+        prompt="{symbol} の現在の実装をレビューしてください。\n重大な不具合、保守性の問題、設計上の問題を優先して指摘してください。",
+        tags=["レビュー", "テンプレート"],
+    ),
 ]
 
 
