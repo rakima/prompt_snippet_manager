@@ -113,6 +113,21 @@ class PromptSnippetManagerGuiTests(unittest.TestCase):
             self.app.delete_prompt()
         self.assertFalse(any(prompt.id == selected.id for prompt in self.app.prompts))
 
+    def test_clipboard_variable_is_filled_from_system_clipboard(self):
+        prompt = PromptSnippet.create("開発", "クリップボード", "内容:\n{clipboard}")
+        self.app.prompts = [prompt]
+        self.app.selected_prompt_id = prompt.id
+        self.app.clipboard_clear()
+        self.app.clipboard_append("貼り付ける内容")
+        self.app.set_detail_prompt(prompt.prompt)
+
+        self.assertEqual(self.app.template_values["clipboard"].get(), "貼り付ける内容")
+        self.assertEqual(str(self.app.template_entries["clipboard"]["state"]), "readonly")
+
+        self.app.copy_prompt()
+
+        self.assertEqual(self.app.clipboard_get(), "内容:\n貼り付ける内容")
+
 
 if __name__ == "__main__":
     unittest.main()
